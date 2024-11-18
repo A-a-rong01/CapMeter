@@ -112,7 +112,7 @@ float selectResistor() {
 }
 
 //Once the range/resistor value is found, we turn on the relay and measure the pulses.
-float turnRelayOn(float selectedResistor) {
+void turnRelayOn(float selectedResistor) {
   // Turn off all relays first
   digitalWrite(relayOne, LOW);
   digitalWrite(relayTwo, LOW);
