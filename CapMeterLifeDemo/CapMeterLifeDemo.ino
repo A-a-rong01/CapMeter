@@ -5,7 +5,6 @@ const int timerOutput = 9; //The pin that connects to the 555 timer output
 const int relayOne = 28, relayTwo = 29, relayThree = 30, relayFour = 31; //The different pins for each of the different relays
 const int rs = 3, en = 4, d4 = 24, d5 = 25, d6 = 26, d7 = 27; //The pins for the LCD screen
 
-LiquidCrystal lcd(rs, en, d4, d5, d6, d7); //tells the teensy where the pins are
 
 //The following are the resistor values used for calculating the capacitance
 const float RA = 1000;
@@ -19,10 +18,17 @@ unsigned long pulseStartTime;
 unsigned long pulseEndTime;
 unsigned long pulseDuration;
 
+
 //Calulating Variables
 float selectedResistor;
 float frequency;
 float capacitance;
+
+//label for capacitance
+String capLabel;
+
+
+LiquidCrystal lcd(rs, en, d4, d5, d6, d7); //tells the teensy where the pins are
 
 void setup() {
   // put your setup code here, to run once:
@@ -45,20 +51,19 @@ void setup() {
 }
 
 void loop() {
-  digitalWrite(relayThree, HIGH);
-  // delay(500);
-  while (digitalRead(timerOutput) == LOW);
-  pulseStartTime = micros();  // Record the time at the start of the pulse
-  
-  // Wait for the pulse to go LOW again
-  while (digitalRead(timerOutput) == HIGH);
-  pulseEndTime = micros();  // Record the time at the end of the pulse
-  
-  // Calculate the pulse duration in microseconds
-  pulseDuration = pulseEndTime - pulseStartTime;
+  while(!isCapacitorAttached()){
+    lcd.setCursor(0,1);
+    lcd.print("No capacitor ");
+    delay(2000);
+    lcd.setCursor(0,1);
+    lcd.print("Please insert");
+    delay(2000);
+  }
+  digitalWrite(relayTwo, HIGH);
+  calcDuration();
   
   calculateFrequency();
-  capacitance = (1.44 / ((RA + (2 * RB_Three)) * frequency))*1000000;
+  calculateCapacitance(frequency, RB_Two);
   // Print the results
   Serial.print("Frequency: ");
   Serial.print(frequency);
@@ -66,7 +71,7 @@ void loop() {
 
   Serial.print("Capacitance: ");
   Serial.print(capacitance, 10);
-  Serial.println(" uF");
+  Serial.println(capLabel);
   
   // Display the frequency on the LCD
   lcd.clear(); // Clear the previous display
@@ -74,15 +79,25 @@ void loop() {
   lcd.print("Capacitance: ");
   lcd.setCursor(0, 1); // Set cursor to the first line
   lcd.print(capacitance, 2); // Print frequency with 2 decimal places
-  lcd.print("uF");
+  lcd.print(capLabel);
   
   delay(1000);  // Update once per second
 
 }
 
+
+//This function checks to see if there is a capacitor attached
+bool isCapacitorAttached(){
+  digitalWrite(relayOne, HIGH);
+  if (digitalRead(timerOutput) == HIGH){
+    return true;
+  } else {
+    return false;
+  }
+}
+
 float calcDuration(){
-  // Calculate the pulse duration in microseconds
-  pulseDuration = pulseEndTime - pulseStartTime;
+  pulseDuration = pulseIn(timerOutput, HIGH); // Measure the pulse duration in microseconds
   return pulseDuration;
 }
 
@@ -92,7 +107,21 @@ float calculateFrequency() {
 }
 
 //This function calculates the capacitance after finding the frequency
-float calculateCapacitance(float frequency,float secResistor) {
-  capacitance = 1.44 / ((RA + (2 * secResistor)) * frequency);
+float calculateCapacitance(float frequency, float secResistor) {
+  capacitance = 1.44 / ((RA + 2 * secResistor) * frequency);
+  if(capacitance >= 1e-6){
+    capacitance = capacitance * 1e6;
+    capLabel = "uF";
+  } else if(capacitance < 1e-6 && capacitance >= 1e-9) {
+    capacitance = capacitance * 1e9;
+    capLabel = "nF";
+  } else if(capacitance < 1e-9 && capacitance >= 1e-12){
+    capacitance = capacitance * 1e12;
+    capLabel = "pF";
+  } else {
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Capacitance scale error");
+  }
   return capacitance; // Still need to determine how to add range
 }
