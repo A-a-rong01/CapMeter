@@ -24,9 +24,6 @@ float selectedResistor;
 float frequency;
 float capacitance;
 
-//label for capacitance
-String capLabel;
-
 
 LiquidCrystal lcd(rs, en, d4, d5, d6, d7); //tells the teensy where the pins are
 
@@ -49,70 +46,76 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
-  while(!isCapacitorAttached()){
-    lcd.setCursor(0,1);
-    lcd.print("No capacitor ");
-    delay(2000);
-    lcd.setCursor(0,1);
-    lcd.print("Please insert");
-    delay(2000);
-  }
+  // while(!isCapacitorAttached()){
+  //   lcd.setCursor(0,1);
+  //   lcd.print("No capacitor ");
+  //   delay(2000);
+  //   lcd.setCursor(0,1);
+  //   lcd.print("Please insert");
+  //   delay(2000);
+  // }
   
-  selectedResistor = selectResistor(); //Essentially is the autorange
+  // selectedResistor = selectResistor(); //Essentially is the autorange
+  selectedResistor = RB_Three; 
 
   //The if statement makes sure that there is a selected resistor value before calculating the capacitance
   if(selectedResistor != -1){
-    turnRelayOn(selectedResistor); // Turns on the Relay after Range is found
+    // turnRelayOn(selectedResistor); // Turns on the Relay after Range is found
+    digitalWrite(relayThree, HIGH);
     pulseDuration = calcDuration(); //When Relay is turned on, determines duration of the pulse
     frequency = calculateFrequency(); //Calculates freq
     capacitance = calculateCapacitance(frequency, selectedResistor); //Calculated Capacitance after determining RB value and Freq
     displayCapacitance(capacitance); //Displays capacitance
   }
+  Serial.println(selectedResistor);
+  Serial.println(frequency);
+  Serial.println(capacitance);
+
 }
 
 //This function checks to see if there is a capacitor attached
-bool isCapacitorAttached(){
-  digitalWrite(relayOne, HIGH);
-  if (digitalRead(timerOutput) == HIGH){
-    return true;
-  } else {
-    return false;
-  }
-}
+// bool isCapacitorAttached(){
+//   digitalWrite(relayOne, HIGH);
+//   if (digitalRead(timerOutput) == HIGH){
+//     return true;
+//   } else {
+//     return false;
+//   }
+// }
 
 
 //This function determined which reistor to use for the calculations aka AutoRange
-float selectResistor() {
-  digitalWrite(relayOne, HIGH);
-  delay(1); // Wait for 1 millisecond
-  pulseDuration = pulseIn(timerOutput, HIGH, 1000);
-  digitalWrite(relayOne, LOW);
-  if (pulseDuration > 0) {
-    return RB_One;
-  } else {
-    digitalWrite(relayTwo, HIGH);
-    delay(1);
-    pulseDuration = pulseIn(timerOutput, HIGH, 1000);
-    digitalWrite(relayTwo, LOW);
-      if (pulseDuration > 0) {
-        return RB_Two;
-      } else {
-        digitalWrite(relayThree, HIGH);
-        delay(1);
-        pulseDuration = pulseIn(timerOutput, HIGH, 1000);
-        digitalWrite(relayThree, LOW);
-          if (pulseDuration > 0) {
-            return RB_Three;
-          } else {
-            digitalWrite(relayFour, HIGH);
-            delay(1);
-            pulseDuration = pulseIn(timerOutput, HIGH, 1000);
-            digitalWrite(relayFour, LOW);
-            return RB_Four;
-      }
-    }
-  }
-}
+// float selectResistor() {
+//   digitalWrite(relayOne, HIGH);
+//   delay(1); // Wait for 1 millisecond
+//   pulseDuration = pulseIn(timerOutput, HIGH, 1000);
+//   digitalWrite(relayOne, LOW);
+//   if (pulseDuration > 0) {
+//     return RB_One;
+//   } else {
+//     digitalWrite(relayTwo, HIGH);
+//     delay(1);
+//     pulseDuration = pulseIn(timerOutput, HIGH, 1000);
+//     digitalWrite(relayTwo, LOW);
+//       if (pulseDuration > 0) {
+//         return RB_Two;
+//       } else {
+//         digitalWrite(relayThree, HIGH);
+//         delay(1);
+//         pulseDuration = pulseIn(timerOutput, HIGH, 1000);
+//         digitalWrite(relayThree, LOW);
+//           if (pulseDuration > 0) {
+//             return RB_Three;
+//           } else {
+//             digitalWrite(relayFour, HIGH);
+//             delay(1);
+//             pulseDuration = pulseIn(timerOutput, HIGH, 1000);
+//             digitalWrite(relayFour, LOW);
+//             return RB_Four;
+//       }
+//     }
+//   }
+// }
 
 //Once the range/resistor value is found, we turn on the relay and measure the pulses.
 void turnRelayOn(float selectedResistor) {
@@ -147,21 +150,7 @@ float calculateFrequency() {
 
 //This function calculates the capacitance after finding the frequency
 float calculateCapacitance(float frequency, float secResistor) {
-  float capacitance = 1.44 / ((RA + 2 * secResistor) * frequency);
-  if(capacitance >= 1e-6){
-    capacitance = capacitance * 1e6;
-    capLabel = "uF";
-  } else if(capacitance < 1e-6 && capacitance >= 1e-9) {
-    capacitance = capacitance * 1e9;
-    capLabel = "nF";
-  } else if(capacitance < 1e-9 && capacitance >= 1e-12){
-    capacitance = capacitance * 1e12;
-    capLabel = "pF";
-  } else {
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("Capacitance scale error");
-  }
+  float capacitance = 1.44 / (0.693 * (RA + 2 * secResistor) * frequency);
   return capacitance; // Still need to determine how to add range
 }
 
