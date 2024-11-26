@@ -13,25 +13,24 @@ const float RB_Two = 400; //Resistor assosciated with RelayTwo for 22nF to 2.2uF
 const float RB_Three = 100; //Resistor assosciated with RelayThree for 3.3uF to 200uF range
 const float RB_Four = 50; //Resistor assosciated with RelayFour for above 200uF range
 
-// Variables to store time measurements
-unsigned long pulseStartTime;
-unsigned long pulseEndTime;
-unsigned long pulseDuration;
+
 
 
 //Calulating Variables
 float selectedResistor;
 float frequency;
 float capacitance;
-
-//label for capacitance
 String capLabel;
 
-// Add a flag variable to track if the relay has already been turned on
+
+// State flags
+volatile bool capacitorDetected = false; // Flag set by interrupt when capacitor is detected
+bool relayCheckInProgress = false;       // Flag to manage auto-sensing process
+unsigned long lastRelayCheckTime = 0;    // Timestamp for non-blocking relay checks
 bool relayOneChecked = false;
 
-
 LiquidCrystal lcd(rs, en, d4, d5, d6, d7); //tells the teensy where the pins are
+
 
 void setup() {
   // put your setup code here, to run once:
@@ -41,6 +40,7 @@ void setup() {
   pinMode(relayThree, OUTPUT);
   pinMode(relayFour, OUTPUT);
 
+// Initialize relays to OFF
   digitalWrite(relayOne, LOW);
   digitalWrite(relayTwo, LOW);
   digitalWrite(relayThree, LOW);
@@ -50,6 +50,9 @@ void setup() {
   lcd.print("Capacitor meter:");
 
   Serial.begin(9600);
+
+  // Attach interrupt for capacitor detection
+  attachInterrupt(digitalPinToInterrupt(timerOutput), detectCapacitor, CHANGE);
 
 }
 
@@ -61,7 +64,7 @@ void loop() {
     relayOneChecked = true; // Mark that we've checked using relayOne
   }
 
-  if(!isCapacitorAttached()){
+  if(!capacitorDetected){
     relayOneChecked = false; // Allow re-checking when a capacitor is removed
     lcd.setCursor(0,1);
     lcd.print("No capacitor ");
@@ -103,12 +106,12 @@ void loop() {
 }
 
 
-//This function checks to see if there is a capacitor attached
-bool isCapacitorAttached(){
-  if (digitalRead(timerOutput) == HIGH){
-    return true;
+// Interrupt Service Routine (ISR) for capacitor detection
+void detectCapacitor() {
+  if (digitalRead(timerOutput) == HIGH) {
+    capacitorDetected = true;
   } else {
-    return false;
+    capacitorDetected = false;
   }
 }
 
