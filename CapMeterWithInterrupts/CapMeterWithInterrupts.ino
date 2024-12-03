@@ -78,20 +78,10 @@ void loop() {
     digitalWrite(relayOne, LOW);
   }
   
-  digitalWrite(relayTwo, HIGH);
-  // selectedResistor = selectResistor();
-  // Serial.println(selectedResistor);
+  selectedResistor = selectResistor();
   calcDuration();
   calculateFrequency();
   calculateCapacitance(frequency, RB_Two);
-  // Print the results
-  Serial.print("Frequency: ");
-  Serial.print(frequency);
-  Serial.println(" Hz");
-
-  Serial.print("Capacitance: ");
-  Serial.print(capacitance, 10);
-  Serial.println(capLabel);
   
   // Display the frequency on the LCD
   lcd.clear(); // Clear the previous display
