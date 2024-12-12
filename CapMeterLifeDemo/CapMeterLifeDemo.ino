@@ -17,12 +17,13 @@ const float RB_Four = 50; //Resistor assosciated with RelayFour for above 200uF 
 // Variables to store time measurements
 unsigned long pulseDuration;
 //Variables for helping me testing the number of pulses
-const int pulseTimer = 100;
+const int autoRangingPulseTimer = 5;
 
 //Calulating Variables
 float frequency;
 float capacitance = 0.00;
 float tripleFiveTimerConstant = 1.44729;
+float resistorRange = 90000;
 
 //label for capacitance
 volatile bool capacitorDetected = false; // Flag set by interrupt when capacitor is detected
@@ -42,9 +43,9 @@ void setup() {
   pinMode(relayThree, OUTPUT);
   pinMode(relayFour, OUTPUT);
 
-  digitalWrite(relayOne, LOW);
+  digitalWrite(relayOne, HIGH);
   digitalWrite(relayTwo, LOW);
-  digitalWrite(relayThree, HIGH);
+  digitalWrite(relayThree, LOW);
   digitalWrite(relayFour, LOW);
 
   lcd.begin(16, 2);
@@ -72,7 +73,8 @@ void loop() {
   
   calcDuration();
   calculateFrequency();
-  calculateCapacitance(frequency, RB_Three);
+  findRange();
+  calculateCapacitance(frequency, resistorRange);
   // Print the results
   Serial.print("Frequency: ");
   Serial.print(frequency);
@@ -122,15 +124,6 @@ void noCapMessageLite() {
     lcd.print("No Cap Detected");
 }
 
-// void noCapMessage() {
-//     lcd.setCursor(0,1);
-//     lcd.print("No capacitor ");
-//     delay(2000);
-//     lcd.setCursor(0,1);
-//     lcd.print("Please insert");
-//     delay(2000);
-// }
-
 
 float calcDuration(){
   pulseDuration = pulseIn(timerOutput, HIGH); // Measure the pulse duration in microseconds
@@ -167,3 +160,37 @@ float calculateCapacitance(float frequency, float secResistor) {
   }
   return capacitance; // Still need to determine how to add range
 }
+
+void findRange() {
+    if(frequency > 2e3){
+      resistorRange = RB_One;
+      Serial.print("first range!");
+    } else {
+      digitalWrite(relayOne, LOW);
+      digitalWrite(relayTwo, HIGH);
+      Serial.print("Second range");
+      calcDuration();
+      calculateFrequency();
+      if(frequency > 150 && frequency <50e3){
+        Serial.println("second range");
+        resistorRange = RB_Two;
+      } else{
+        digitalWrite(relayTwo, LOW);
+        digitalWrite(relayThree, HIGH);
+        Serial.print("Third range");
+        calcDuration();
+        calculateFrequency();
+        if(frequency > 6 && frequency < 200){
+          Serial.print("Third range");
+          resistorRange = RB_Three;
+        } else {
+          Serial.print("Fourth range");
+          resistorRange = RB_Four;
+        }
+      }
+    }
+}
+
+
+
+
