@@ -1,72 +1,117 @@
+/**
+ * CAPACITANCE METER PROGRAM
+ *
+ * This program measures capacitance using a 555 timer circuit and a Teensy microcontroller.
+ * 
+ * 
+ * Features:
+ * - Auto-ranging for capacitance measurement from 20 pF to 200 uF.
+ * - Accuracy with a 555 timer constant-based formula from less than 15% to 2% tolarance based on range.
+ * - Real-time results displayed on a 16x2 LCD.
+ *
+ * Author: Aaron Guerrero & Hoang Long Bui
+ * Date: DECEMBER 13TH 2024 - (last official update)
+ * UW Bothell - B EE 425: Microprocessor system design
+ * Version: 4.0
+ *
+ *
+ * 
+ * Usage Notes:
+ * - Ensure proper connections of all hardware components before running the program.
+ * - Debugging messages can be read through the serial monitor.
+ * 
+ */
 #include <LiquidCrystal.h>
 #include <FreqCount.h>
 
-//The following are the pins for the components connecting to the microcontroller
-const int timerOutput = 9; //The pin that connects to the 555 timer output
-const int relayOne = 28, relayTwo = 29, relayThree = 30, relayFour = 31; //The different pins for each of the different relays
-const int rs = 3, en = 4, d4 = 24, d5 = 25, d6 = 26, d7 = 27; //The pins for the LCD screen
+
+//======================== PIN CONFIGURATION ========================
+// Pins connecting the teensy microcontroller to various components
+const int timerOutput = 9; // Pin connected to the 555 timer output
+const int relayOne = 28, relayTwo = 29, relayThree = 30, relayFour = 31; // Relay pins for selecting resistor ranges
+const int rs = 3, en = 4, d4 = 24, d5 = 25, d6 = 26, d7 = 27; // LCD screen pins
+//========================================================================
 
 
-//The following are the resistor values used for calculating the capacitance
-const float RA = 1000;
-const float RB_One = 90000; //Resistor assosciated with RelayOne for 10pF to 2nF range
-const float RB_Two = 400; //Resistor assosciated with RelayTwo for 22nF to 2.2uF range
-const float RB_Three = 100; //Resistor assosciated with RelayThree for 3.3uF to 200uF range
-const float RB_Four = 50; //Resistor assosciated with RelayFour for above 200uF range
+//======================== RESISTOR VALUES ==========================
+// Resistor values (in ohms) used for calculating capacitance in different ranges
+const float RA = 1000;       // Fixed resistor value
+const float RB_One = 90000;  // Resistor for 10pF to 2nF range (Relay One)
+const float RB_Two = 400;    // Resistor for 22nF to 2.2uF range (Relay Two)
+const float RB_Three = 100;  // Resistor for 3.3uF to 200uF range (Relay Three)
+const float RB_Four = 50;    // Resistor for above 200uF range (Relay Four)
+//========================================================================
+
+//======================== MEASUREMENT VARIABLES ====================
+// Variables for storing time and frequency measurements
+unsigned long pulseDuration; // Time duration of the signal pulse
+float frequency;             // Frequency of the signal in Hz
+//========================================================================
 
 
-// Variables to store time measurements
-unsigned long pulseDuration;
-
-//Calulating Variables
-float frequency;
-float capacitance = 0.00;
-float CorrectedCap = 0.00;
-float tripleFiveTimerConstant = 1.44729;
-float secResistor = 90000;
-
-//label for capacitance
-volatile bool capacitorDetected = false; // Flag set by interrupt when capacitor is detected
-String capLabel;
-String rangeSelected;
-
-volatile bool begIntroRan = false; // Flag set by interrupt when capacitor is detected
-volatile bool rangeFound = false; // Flag set if range is found or not
-volatile bool errorCapHandling = false; // Flag set if range is found or not
-int autoSenseCounter = 0;
+//======================== CALCULATION VARIABLES ====================
+// Variables for capacitance calculation
+float capacitance = 0.00;     // Measured capacitance value
+float CorrectedCap = 0.00;    // Corrected capacitance value
+float tripleFiveTimerConstant = 1.44729; // Constant derived from 555 timer calculations
+float selectedResistorBValue = 90000;    // Secondary resistor value (updated dynamically based on range)
+//========================================================================
 
 
-LiquidCrystal lcd(rs, en, d4, d5, d6, d7); //tells the teensy where the pins are
+//======================== CAPACITANCE LABELS & SYSTEM FLAGS =======================
+// Labels and flags for displaying capacitance and handling ranges
+volatile bool capacitorDetected = false; // Set when a capacitor is detected
+String capLabel;                         // Label for displaying capacitance units
+String rangeSelected;                    // String to indicate selected range
+// Flags for controlling program flow and error handling
+volatile bool isIntroductionDisplayed = false;     // Indicates if the introduction message ran
+volatile bool rangeFound = false;     // Indicates if the correct range has been identified; True if there is an error and false if none is found
+volatile bool errorCapHandling = false; // Indicates an error in handling capacitance measurement
+int autoSenseCounter = 0;             // Counter for auto-sensing retries
+//========================================================================
+
+
+//======================== LCD CONFIGURATION ========================
+// LCD object initialization with defined pins
+LiquidCrystal lcd(rs, en, d4, d5, d6, d7); // Specifies LCD connections to the microcontroller
+//========================================================================
+
 
 void setup() {
-  // put your setup code here, to run once:
+  // Configure the timer output pin as input
   pinMode(timerOutput, INPUT);
+
+  // Configure relay pins as output
   pinMode(relayOne, OUTPUT);
   pinMode(relayTwo, OUTPUT);
   pinMode(relayThree, OUTPUT);
   pinMode(relayFour, OUTPUT);
 
+  // Set all relays to LOW (inactive)
   digitalWrite(relayOne, LOW);
   digitalWrite(relayTwo, LOW);
   digitalWrite(relayThree, LOW);
   digitalWrite(relayFour, LOW);
 
+  // Initialize the LCD screen
   lcd.begin(16, 2);
   lcd.print("B EE 425");
   lcd.setCursor(0, 1);
   lcd.print("Design Project");
-  delay(2000); 
+  delay(2000); // Brief delay to display the initial message
 
+  // Start serial communication
   Serial.begin(9600);
 
-  // Attach interrupt for capacitor detection
+  // Attach interrupt to detect capacitor
   attachInterrupt(digitalPinToInterrupt(timerOutput), detectCapacitor, FALLING);
 }
 
+
 void loop() {
-  if(!begIntroRan){
+  if(!isIntroductionDisplayed){
     introMessage();
-    begIntroRan = true;
+    isIntroductionDisplayed = true;
   }
 
   if(capacitance == 0.00 || abs(capacitance - 15.99) < 0.01 || abs(capacitance - 23.98) < 0.01){ // mabybe add "!capacitorDetected ||" later
@@ -81,20 +126,22 @@ void loop() {
   
   calcDuration();
   calculateFrequency();
-  calculateCapacitance(frequency, secResistor);
+  calculateCapacitance(frequency, selectedResistorBValue);
+
+
   // Print the results
   Serial.print("Frequency: ");
   Serial.print(frequency);
   Serial.println(" Hz");
-
-  Serial.print("Capacitance: ");
-  Serial.print(capacitance, 10);
+  Serial.print("Calculated Capacitance: ");
+  Serial.print(capacitance, 5);
   Serial.println(capLabel);
-
   Serial.print("Range Selected: ");
   Serial.println(rangeSelected);
-  Serial.println("Resistor: " + String(secResistor));
-  Serial.println("corrected cap: " + String(CorrectedCap));
+  Serial.println("Resistor Selected: " + String(selectedResistorBValue) + " ohms");
+  Serial.println("Corrected capacitance: " + String(CorrectedCap) + capLabel);
+
+
   String errorCap = String(capacitance,2) + capLabel; 
   if(errorCap == "15.99pF" || errorCap == "23.99pF"){
     errorCapHandling = true;
@@ -118,7 +165,7 @@ void loop() {
   if(capacitance == 0.00 || abs(capacitance - 15.99) < 0.01 || abs(capacitance - 23.98) < 0.01 || abs(capacitance - lastCapacitance) > 100.00){
     rangeFound = false;
   }
-  Serial.println("____________________________________________-");
+  Serial.println("____________________________________________");
   delay(500);
 }
 
@@ -165,12 +212,12 @@ float calculateFrequency() {
 }
 
 //This function calculates the capacitance after finding the frequency
-float calculateCapacitance(float frequency, float secResistor) {
+float calculateCapacitance(float frequency, float selectedResistorBValue) {
   if (frequency == 0) {
     capacitance = 0; // Or some default value
     return capacitance;
   }
-  capacitance = tripleFiveTimerConstant / ((RA + 2 * secResistor) * frequency);
+  capacitance = tripleFiveTimerConstant / ((RA + 2 * selectedResistorBValue) * frequency);
   if(capacitance >= 1e-6){
     capacitance = capacitance * 1e6;
     capLabel = "uF";
@@ -218,7 +265,7 @@ void findRange() {
     calcDuration();
     calculateFrequency();
     if (frequency > 2000.00 && frequency < 550000.00) {
-        secResistor = RB_One;
+        selectedResistorBValue = RB_One;
         rangeSelected = "First range";
         return;
     }
@@ -231,7 +278,7 @@ void findRange() {
     calculateFrequency();
     Serial.println(frequency);
     if (frequency > 330 && frequency <= 50000) {
-        secResistor = RB_Two;
+        selectedResistorBValue = RB_Two;
         rangeSelected = "Second range";
         return;
     }
@@ -243,7 +290,7 @@ void findRange() {
     calcDuration();
     calculateFrequency();
     if (frequency  < 500 && frequency > 6) {
-        secResistor = RB_Three;
+        selectedResistorBValue = RB_Three;
         rangeSelected = "Third range";
         return;
     }
@@ -255,12 +302,12 @@ void findRange() {
     calcDuration();
     calculateFrequency();
     if (frequency < 6 && frequency != 0.00) {
-        secResistor = RB_Four;
+        selectedResistorBValue = RB_Four;
         rangeSelected = "Fourth range";
         return;
     }
     else{
-      secResistor = RB_One;
+      selectedResistorBValue = RB_One;
       rangeSelected = "Unknown range";
       digitalWrite(relayFour, LOW);
       digitalWrite(relayOne, HIGH);  // Activate relay four
@@ -269,7 +316,7 @@ void findRange() {
 }
 
 float capacitanceCorrections(float capacitance , String capLabel) {
-  if(rangeSelected =="First range"){
+  if(rangeSelected == "First range"){
     CorrectedCap = (capacitance * 1.869);
     Serial.println("Cap Correct line 1 detected");
   } else if(rangeSelected == "Second range"){
