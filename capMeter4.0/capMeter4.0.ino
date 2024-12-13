@@ -1,6 +1,5 @@
 #include <LiquidCrystal.h>
 #include <FreqCount.h>
-// #include <FlexPWM.h>
 
 //The following are the pins for the components connecting to the microcontroller
 const int timerOutput = 9; //The pin that connects to the 555 timer output
@@ -18,14 +17,10 @@ const float RB_Four = 50; //Resistor assosciated with RelayFour for above 200uF 
 
 // Variables to store time measurements
 unsigned long pulseDuration;
-//Variables for helping me testing the number of pulses
-const int autoRangingPulseTimer = 5;
-
 
 //Calulating Variables
 float frequency;
 float capacitance = 0.00;
-float intermediteCap = 0.00;
 float CorrectedCap = 0.00;
 float tripleFiveTimerConstant = 1.44729;
 float secResistor = 90000;
@@ -105,7 +100,6 @@ void loop() {
     errorCapHandling = true;
     Serial.print(errorCapHandling);
   }
-  Serial.println("inter" + String(intermediteCap));
 
   capacitanceCorrections(capacitance, capLabel);
   
@@ -121,7 +115,7 @@ void loop() {
     lastCapacitance = CorrectedCap;
 }
   delay(1000);  // Update once per second
-  if(capacitance == 0.00 || abs(capacitance - 15.99) < 0.01 || abs(capacitance - 23.98) < 0.01 || abs(capacitance - lastCapacitance) > 50.00){
+  if(capacitance == 0.00 || abs(capacitance - 15.99) < 0.01 || abs(capacitance - 23.98) < 0.01 || abs(capacitance - lastCapacitance) > 100.00){
     rangeFound = false;
   }
   Serial.println("____________________________________________-");
@@ -177,7 +171,6 @@ float calculateCapacitance(float frequency, float secResistor) {
     return capacitance;
   }
   capacitance = tripleFiveTimerConstant / ((RA + 2 * secResistor) * frequency);
-  intermediteCap = capacitance;
   if(capacitance >= 1e-6){
     capacitance = capacitance * 1e6;
     capLabel = "uF";
@@ -236,7 +229,8 @@ void findRange() {
     delay(100);
     calcDuration();
     calculateFrequency();
-    if (frequency > 150 && frequency <= 50000) {
+    Serial.println(frequency);
+    if (frequency > 330 && frequency <= 50000) {
         secResistor = RB_Two;
         rangeSelected = "Second range";
         return;
@@ -245,10 +239,10 @@ void findRange() {
     // Test third range
     digitalWrite(relayTwo, LOW);
     digitalWrite(relayThree, HIGH);  // Activate relay three
-    delay(100);
+    delay(400);
     calcDuration();
     calculateFrequency();
-    if (frequency > 6 && frequency <= 200) {
+    if (frequency  < 500 && frequency > 6) {
         secResistor = RB_Three;
         rangeSelected = "Third range";
         return;
@@ -276,13 +270,13 @@ void findRange() {
 
 float capacitanceCorrections(float capacitance , String capLabel) {
   if(rangeSelected =="First range"){
-    CorrectedCap = (capacitance * 0.9869) + (14.7327 * 1e-12);
+    CorrectedCap = (capacitance * 1.869);
     Serial.println("Cap Correct line 1 detected");
   } else if(rangeSelected == "Second range"){
-    CorrectedCap = (capacitance * 0.9951) - (2.1129 * 1e-9);
+    CorrectedCap = (capacitance * 1.2620) + (0.2);
     Serial.println("Cap Correct line 2 detected");
   } else if(rangeSelected == "Third range"){
-    CorrectedCap = (capacitance * 1.1105) + (0.8535 * 1e-9);
+    CorrectedCap = (capacitance * 0.705) + (0.8535 * 1e-9);
     Serial.println("Cap Correct line 3 detected");
   } else if(rangeSelected == "Fourth range"){
     CorrectedCap = (capacitance);
@@ -291,6 +285,3 @@ float capacitanceCorrections(float capacitance , String capLabel) {
   delay(500);
   return capacitance;
 }
-
-
-

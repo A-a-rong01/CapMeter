@@ -6,7 +6,7 @@ import os
 
 # Constants used for calculating the frequencies
 Ra = 1000  # 1 kOhm
-Rb = 50   # 100 Ohms
+Rb = 400   # 100 Ohms
 # RBOne = 90000  #Resistor assosciated with RelayOne for 10pF to 2nF range
 # RBTwo = 400  #Resistor assosciated with RelayTwo for 22nF to 2.2uF range
 # RBFour = 50 #Resistor assosciated with RelayFour for above 200uF range
@@ -64,7 +64,7 @@ def format_data(capacitances, frequencies):
 # Generate capacitance values
 picofarads = np.arange(20, 100, 5) * 1e-12  # 20 pF to 100 pF in steps of 5 pF
 nanofarads = np.arange(5, 805, 10) * 1e-9    # 5 nF to 800 nF in steps of 5 nF
-microfarads = np.arange(5, 205, 5) * 1e-6   # 5 µF to 200 µF in steps of 5 µF
+microfarads = np.arange(3, 205, 5) * 1e-6   # 5 µF to 200 µF in steps of 5 µF
 
 # Combine all capacitances
 capacitances = np.concatenate((picofarads, nanofarads, microfarads))
